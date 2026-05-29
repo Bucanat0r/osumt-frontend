@@ -10,6 +10,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState('User');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,17 +23,32 @@ export default function LoginPage() {
       // Connect to your NestJS backend API
       const response = await axios.post('http://localhost:3000/auth/login', {
         email,
-        pass: password, // Maps to 'pass' parameter in NestJS controller
+        pass: password,
       });
 
       const { access_token, user } = response.data;
 
-      // Save token securely in user session cookies (expires in 1 day)
-      setCookie('token', access_token, { maxAge: 60 * 60 * 24 });
-      setCookie('user_role', user.role, { maxAge: 60 * 60 * 24 });
+      // Determine prototype role redirection mapping
+      let mappedRole = user.role;
+      let redirectUrl = '/dashboard';
 
-      // Forward to portal area
-      router.push('/dashboard');
+      if (selectedRole === 'User') {
+        mappedRole = 'User';
+        redirectUrl = '/waybills';
+      } else if (selectedRole === 'Clerk') {
+        mappedRole = 'Revenue Clerk';
+        redirectUrl = '/finance';
+      } else if (selectedRole === 'CEO') {
+        mappedRole = 'Super Admin / CEO';
+        redirectUrl = '/dashboard';
+      }
+
+      // Save token and mapped role in cookies
+      setCookie('token', access_token, { maxAge: 60 * 60 * 24 });
+      setCookie('user_role', mappedRole, { maxAge: 60 * 60 * 24 });
+
+      // Forward to specific landing dashboard
+      router.push(redirectUrl);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Authentication failed. Please try again.');
     } finally {
@@ -95,6 +111,29 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
               />
+            </div>
+          </div>
+
+          {/* Role selector tab grid */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+              Select Portal View (Role)
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {['User', 'Clerk', 'CEO'].map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => setSelectedRole(role)}
+                  className={`py-2 text-sm font-bold rounded-lg border transition-all ${
+                    selectedRole === role
+                      ? 'bg-blue-900 text-white border-blue-900 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {role}
+                </button>
+              ))}
             </div>
           </div>
 
