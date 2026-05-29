@@ -24,7 +24,8 @@ import {
   FileText,
   Plus,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Search
 } from 'lucide-react';
 import DailySalesPosting from '../finance/page';
 
@@ -254,6 +255,16 @@ export default function AdminDashboard() {
               className="h-full px-3 text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300 text-xs font-medium flex items-center gap-2 border-b-2 transition-all cursor-pointer"
             >
               <Truck className="h-4 w-4" /> Waybills Desk
+            </button>
+          )}
+
+          {/* Track Shipment (User and Clerk) */}
+          {!isCEO && (
+            <button 
+              onClick={() => router.push('/tracking')}
+              className="h-full px-3 text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300 text-xs font-medium flex items-center gap-2 border-b-2 transition-all cursor-pointer"
+            >
+              <Search className="h-4 w-4" /> Track Shipment
             </button>
           )}
 

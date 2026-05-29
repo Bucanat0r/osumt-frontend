@@ -83,6 +83,8 @@ export default function WaybillRegistration() {
     e.preventDefault();
     try {
       const payload = {
+        origin: 'Lagos Central',
+        destination: 'Abuja Main',
         sender_name: senderName,
         sender_phone: senderPhone,
         receiver_name: receiverName,
