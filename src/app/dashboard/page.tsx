@@ -1,12 +1,19 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { getCookie, deleteCookie } from 'cookies-next';
 import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const userRole = getCookie('user_role') || 'Staff';
+  const [userRole, setUserRole] = useState('Staff');
+
+  useEffect(() => {
+    const role = getCookie('user_role');
+    if (role) {
+      setUserRole(role as string);
+    }
+  }, []);
 
   const handleLogout = () => {
     deleteCookie('token');
