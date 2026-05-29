@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { getCookie, deleteCookie } from 'cookies-next';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ClipboardList, LogOut } from 'lucide-react';
+import { ClipboardList, LogOut, DollarSign } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -39,6 +39,13 @@ export default function DashboardPage() {
             className="w-full rounded-lg bg-blue-900 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-950 flex items-center justify-center gap-2"
           >
             <ClipboardList className="h-4 w-4" /> Go to Waybill Registration Desk
+          </Link>
+
+          <Link
+            href="/finance"
+            className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700 flex items-center justify-center gap-2"
+          >
+            <DollarSign className="h-4 w-4" /> Go to Revenue Posting Desk
           </Link>
           
           <button
