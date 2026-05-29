@@ -26,12 +26,17 @@ export default function WaybillRegistration() {
   const [receiverName, setReceiverName] = useState('');
   const [receiverPhone, setReceiverPhone] = useState('');
   const [receiverAddress, setReceiverAddress] = useState('');
+  const [origin, setOrigin] = useState('Lagos Central');
+  const [destination, setDestination] = useState('Abuja Main');
   const [itemDescription, setItemDescription] = useState('');
   const [declaredValue, setDeclaredValue] = useState(0);
   const [weight, setWeight] = useState(0);
   const [isFragile, setIsFragile] = useState(false);
   const [isHomeDelivery, setIsHomeDelivery] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('Unpaid');
+
+  // Available depots
+  const depots = ['Lagos Central', 'Abuja Main', 'Port Harcourt', 'Kano Terminal', 'Ibadan Hub', 'Enugu Depot', 'Benin City', 'Warri Terminal'];
 
   // Pricing Engine Evaluation Engine State
   const [officialPrice, setOfficialPrice] = useState(0);
@@ -50,8 +55,8 @@ export default function WaybillRegistration() {
         setLoadingQuote(true);
         try {
           const response = await axios.post('http://localhost:3000/waybills/quote', {
-            origin: 'Lagos Central',
-            destination: 'Abuja Main',
+            origin,
+            destination,
             weight: Number(weight),
             isFragile,
             isHomeDelivery,
@@ -72,7 +77,7 @@ export default function WaybillRegistration() {
       setOfficialPrice(0);
       setFinalPrice(0);
     }
-  }, [weight, isFragile, isHomeDelivery]);
+  }, [weight, isFragile, isHomeDelivery, origin, destination]);
 
   const handleFinalPriceChange = (value: number) => {
     setFinalPrice(value);
@@ -83,8 +88,8 @@ export default function WaybillRegistration() {
     e.preventDefault();
     try {
       const payload = {
-        origin: 'Lagos Central',
-        destination: 'Abuja Main',
+        origin,
+        destination,
         sender_name: senderName,
         sender_phone: senderPhone,
         receiver_name: receiverName,
@@ -159,6 +164,25 @@ export default function WaybillRegistration() {
               <div>
                 <label className="text-xs font-semibold text-slate-600">Delivery Home Address (Optional)</label>
                 <textarea rows={2} value={receiverAddress} onChange={(e) => setReceiverAddress(e.target.value)} className="w-full mt-1 rounded-lg border border-slate-200 p-2 text-sm focus:outline-none focus:border-blue-600" />
+              </div>
+            </div>
+
+            {/* Route / Depot Selection */}
+            <div className="rounded-xl bg-white p-6 shadow-sm border border-slate-100 space-y-4">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 border-b pb-2">Shipping Route</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Origin Depot</label>
+                  <select value={origin} onChange={(e) => setOrigin(e.target.value)} className="w-full mt-1 rounded-lg border border-slate-200 p-2 text-sm focus:outline-none focus:border-blue-600">
+                    {depots.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Destination Depot</label>
+                  <select value={destination} onChange={(e) => setDestination(e.target.value)} className="w-full mt-1 rounded-lg border border-slate-200 p-2 text-sm focus:outline-none focus:border-blue-600">
+                    {depots.filter(d => d !== origin).map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
 

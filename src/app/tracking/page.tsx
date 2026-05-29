@@ -156,6 +156,36 @@ export default function TrackingPage() {
               </div>
             </div>
 
+            {/* Route Info */}
+            {(result.origin || result.destination) && (
+              <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">Shipping Route</h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
+                      <Package className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Origin</p>
+                      <p className="text-sm font-semibold text-slate-800">{result.origin || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex-1 mx-4 border-t-2 border-dashed border-slate-200 relative">
+                    <Truck className="h-5 w-5 text-blue-600 absolute -top-2.5 left-1/2 -translate-x-1/2 bg-white px-1" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-right">Destination</p>
+                      <p className="text-sm font-semibold text-slate-800 text-right">{result.destination || 'N/A'}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                      <MapPin className="h-5 w-5 text-emerald-600" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Progress Timeline */}
             <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-xs">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-6">Shipment Progress</h3>
