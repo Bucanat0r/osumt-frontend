@@ -293,7 +293,7 @@ export default function WaybillRegistration() {
                 <p className="text-xs uppercase font-bold tracking-wider">Status: {createdWaybill.payment}</p>
               </div>
               <div className="pt-4 flex gap-3 no-print">
-                <button onClick={() => window.print()} className="flex-1 bg-slate-900 text-white font-bold py-2 rounded flex items-center justify-center gap-2 hover:bg-black">
+                <button onClick={() => { window.print(); router.push('/dashboard'); }} className="flex-1 bg-slate-900 text-white font-bold py-2 rounded flex items-center justify-center gap-2 hover:bg-black cursor-pointer">
                   <Printer className="h-4 w-4" /> Print Document
                 </button>
                 <button onClick={() => setShowReceipt(false)} className="flex-1 bg-slate-200 text-slate-700 font-bold py-2 rounded hover:bg-slate-300">

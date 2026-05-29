@@ -117,9 +117,17 @@ export default function AdminDashboard() {
   }, []);
 
   const handleLogout = () => {
-    deleteCookie('token');
-    deleteCookie('user_role');
-    router.push('/login');
+    // Expire all session cookies immediately
+    deleteCookie('token', { path: '/' });
+    deleteCookie('user_role', { path: '/' });
+    // Also force-expire via document.cookie for any lingering cookies
+    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    document.cookie = 'user_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    // Clear local state
+    setUserRole('');
+    setData(null);
+    // Use replace to prevent back-button returning to dashboard
+    router.replace('/login');
   };
 
   const handleFlagClick = async (flag: any) => {
