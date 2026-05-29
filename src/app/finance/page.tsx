@@ -15,6 +15,7 @@ export default function DailySalesPosting() {
   const [postingDate, setPostingDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+  const [bankProofFile, setBankProofFile] = useState<File | null>(null);
 
   // Real-Time System Evaluation Outputs
   const [remittanceDeduction, setRemittanceDeduction] = useState<number>(0);
@@ -68,7 +69,9 @@ export default function DailySalesPosting() {
         expenses: Number(expenses),
         credit_paid: Number(creditPaid),
         actual_banked: Number(actualBanked),
-        bank_proof_url: 'https://storage.osumtgo.com/proofs/mock-slip.jpg'
+        bank_proof_url: bankProofFile
+          ? `https://storage.osumtgo.com/proofs/${bankProofFile.name}`
+          : 'https://storage.osumtgo.com/proofs/mock-slip.jpg'
       };
 
       const response = await axios.post('http://localhost:3000/finance/daily-sales', payload);
@@ -190,7 +193,15 @@ export default function DailySalesPosting() {
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600">Attach Bank Teller Proof Document</label>
-                  <input type="file" disabled className="w-full mt-1 text-xs block file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-not-allowed" />
+                  <input 
+                    type="file" 
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setBankProofFile(e.target.files[0]);
+                      }
+                    }} 
+                    className="w-full mt-1 text-xs block file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" 
+                  />
                 </div>
               </div>
             </div>
