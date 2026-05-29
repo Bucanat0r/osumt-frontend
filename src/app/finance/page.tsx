@@ -3,9 +3,31 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { getCookie } from 'cookies-next';
 import { DollarSign, FileText, Lock, AlertCircle, CheckCircle, Scale, ArrowLeft } from 'lucide-react';
 
 export default function DailySalesPosting() {
+  const router = useRouter();
+  const [userRole, setUserRole] = useState<string>('');
+
+  useEffect(() => {
+    const role = getCookie('user_role');
+    if (!role) {
+      router.push('/login');
+      return;
+    }
+    const roleStr = role as string;
+    setUserRole(roleStr);
+
+    const isCEO = roleStr.includes('CEO') || roleStr.includes('Super Admin');
+    const isClerkOrFinance = roleStr.includes('Clerk') || roleStr.includes('Finance');
+
+    if (!isCEO && !isClerkOrFinance) {
+      router.push('/waybills');
+    }
+  }, []);
+
   // Financial Input Form Fields
   const [cashPos, setCashPos] = useState<number>(0);
   const [credit, setCredit] = useState<number>(0);

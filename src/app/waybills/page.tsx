@@ -3,9 +3,23 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { getCookie } from 'cookies-next';
 import { Truck, Printer, DollarSign, Calculator, AlertTriangle, ArrowLeft } from 'lucide-react';
 
 export default function WaybillRegistration() {
+  const router = useRouter();
+  const [userRole, setUserRole] = useState<string>('');
+
+  useEffect(() => {
+    const role = getCookie('user_role');
+    if (!role) {
+      router.push('/login');
+      return;
+    }
+    setUserRole(role as string);
+  }, []);
+
   // Form State fields
   const [senderName, setSenderName] = useState('');
   const [senderPhone, setSenderPhone] = useState('');
@@ -102,12 +116,14 @@ export default function WaybillRegistration() {
             <p className="text-sm text-slate-500">Create shipments and instantly quote prices using the system engine.</p>
           </div>
           <div className="flex items-center gap-3">
-            <Link 
-              href="/dashboard" 
-              className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 border shadow-sm hover:bg-slate-100 transition-all flex items-center gap-1.5"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to Dashboard
-            </Link>
+            {userRole && (userRole.includes('CEO') || userRole.includes('Super Admin') || userRole.includes('Clerk') || userRole.includes('Finance')) && (
+              <Link 
+                href="/dashboard" 
+                className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 border shadow-sm hover:bg-slate-100 transition-all flex items-center gap-1.5"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> Back to Dashboard
+              </Link>
+            )}
             <Truck className="h-8 w-8 text-blue-900" />
           </div>
         </div>
