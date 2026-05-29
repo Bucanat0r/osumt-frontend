@@ -248,20 +248,19 @@ export default function AdminDashboard() {
           </button>
 
           {/* Waybills Desk */}
-          <button 
-            onClick={() => router.push('/waybills')}
-            className="h-full px-3 text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300 text-xs font-medium flex items-center gap-2 border-b-2 transition-all cursor-pointer"
-          >
-            <Truck className="h-4 w-4" /> Waybills Desk
-          </button>
-
-          {/* Finance Desk Tab (For Clerk/CEO) */}
-          {(isClerk || isCEO) && (
+          {!isCEO && (
             <button 
-              onClick={() => {
-                if (isClerk) setActiveTab('finance-desk');
-                else router.push('/finance');
-              }}
+              onClick={() => router.push('/waybills')}
+              className="h-full px-3 text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300 text-xs font-medium flex items-center gap-2 border-b-2 transition-all cursor-pointer"
+            >
+              <Truck className="h-4 w-4" /> Waybills Desk
+            </button>
+          )}
+
+          {/* Finance Desk Tab (For Clerk only) */}
+          {isClerk && (
+            <button 
+              onClick={() => setActiveTab('finance-desk')}
               className={`h-full px-3 text-xs font-medium flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
                 activeTab === 'finance-desk' 
                   ? 'text-blue-600 border-blue-600 bg-blue-50/10 font-semibold' 
