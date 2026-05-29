@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { getCookie, deleteCookie } from 'cookies-next';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ClipboardList, LogOut } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -30,12 +32,22 @@ export default function DashboardPage() {
         <p className="text-sm text-slate-500 font-medium">
           Welcome to the Portal! You are logged in as a <span className="font-semibold text-blue-600">{userRole}</span>.
         </p>
-        <button
-          onClick={handleLogout}
-          className="w-full rounded-lg bg-red-600 py-3 text-sm font-bold text-white transition-colors hover:bg-red-700 focus:outline-none"
-        >
-          Logout
-        </button>
+
+        <div className="space-y-3 pt-2">
+          <Link
+            href="/waybills"
+            className="w-full rounded-lg bg-blue-900 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-950 flex items-center justify-center gap-2"
+          >
+            <ClipboardList className="h-4 w-4" /> Go to Waybill Registration Desk
+          </Link>
+          
+          <button
+            onClick={handleLogout}
+            className="w-full rounded-lg border border-red-200 text-red-600 py-3 text-sm font-bold transition-colors hover:bg-red-50 flex items-center justify-center gap-2"
+          >
+            <LogOut className="h-4 w-4" /> Logout
+          </button>
+        </div>
       </div>
     </div>
   );
