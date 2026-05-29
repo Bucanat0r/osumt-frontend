@@ -5,10 +5,27 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { deleteCookie, getCookie } from 'cookies-next';
-import { TrendingUp, AlertTriangle, Landmark, ShieldCheck, RefreshCw, LogOut, X, CheckCircle, Scale } from 'lucide-react';
-
-// Import child portal desks
-import WaybillRegistration from '../waybills/page';
+import { 
+  TrendingUp, 
+  AlertTriangle, 
+  Landmark, 
+  ShieldCheck, 
+  RefreshCw, 
+  LogOut, 
+  X, 
+  CheckCircle, 
+  Scale, 
+  Truck, 
+  User as UserIcon, 
+  BookOpen, 
+  Clock,
+  Bell,
+  Code,
+  FileText,
+  Plus,
+  Trash2,
+  ExternalLink
+} from 'lucide-react';
 import DailySalesPosting from '../finance/page';
 
 export default function AdminDashboard() {
@@ -16,6 +33,7 @@ export default function AdminDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string>('');
+  const [recentWaybills, setRecentWaybills] = useState<any[]>([]);
 
   // Clerk specific tabs: 'control-tower' | 'finance-desk'
   const [activeTab, setActiveTab] = useState<'control-tower' | 'finance-desk'>('control-tower');
@@ -27,14 +45,20 @@ export default function AdminDashboard() {
   const [modalError, setModalError] = useState('');
 
   const fetchDashboardMetrics = async () => {
-    setLoading(true);
     try {
       const response = await axios.get('http://localhost:3000/admin/dashboard');
       setData(response.data);
     } catch (err) {
       console.error('Error parsing dashboard metrics', err);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const fetchRecentWaybills = async () => {
+    try {
+      const response = await axios.get('http://localhost:3000/waybills');
+      setRecentWaybills(response.data.slice(0, 4));
+    } catch (err) {
+      console.error('Error fetching waybills', err);
     }
   };
 
@@ -50,12 +74,16 @@ export default function AdminDashboard() {
     const isCEO = roleStr.includes('CEO') || roleStr.includes('Super Admin');
     const isClerkOrFinance = roleStr.includes('Clerk') || roleStr.includes('Finance');
 
-    // Only fetch dashboard metrics if authorized for admin features
-    if (isCEO || isClerkOrFinance) {
-      fetchDashboardMetrics();
-    } else {
+    const init = async () => {
+      setLoading(true);
+      if (isCEO || isClerkOrFinance) {
+        await fetchDashboardMetrics();
+      }
+      await fetchRecentWaybills();
       setLoading(false);
-    }
+    };
+
+    init();
   }, []);
 
   const handleLogout = () => {
@@ -100,7 +128,7 @@ export default function AdminDashboard() {
       }
       await axios.put(endpoint, modalData);
       setSelectedFlag(null);
-      fetchDashboardMetrics();
+      await fetchDashboardMetrics();
     } catch (err: any) {
       setModalError(err.response?.data?.message || 'Failed to update record.');
     } finally {
@@ -108,56 +136,23 @@ export default function AdminDashboard() {
     }
   };
 
+  const isCEO = userRole.includes('CEO') || userRole.includes('Super Admin');
+  const isClerk = userRole.includes('Clerk') || userRole.includes('Finance');
+
+  // Audit Flags filtering
+  const flags = data?.flags || [];
+  const activeFlags = flags.filter((f: any) => !f.resolved);
+  const resolvedFlags = flags.filter((f: any) => f.resolved);
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 font-sans">
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f7fb] font-sans">
         <p className="text-sm font-bold text-slate-500 animate-pulse">Syncing Operational Ledgers...</p>
       </div>
     );
   }
 
-  // 1. Regular User Portal View (Waybill Form directly on dashboard)
-  if (userRole === 'User') {
-    return <WaybillRegistration />;
-  }
-
-  const isCEO = userRole.includes('CEO') || userRole.includes('Super Admin');
-  const isClerk = userRole.includes('Clerk') || userRole.includes('Finance');
-
-  // If active tab is Clerk's finance-desk, show Daily Sales Posting page inside Dashboard
-  if (isClerk && activeTab === 'finance-desk') {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        {/* Sub-header tab toggler */}
-        <div className="bg-white border-b px-6 py-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
-          <div>
-            <h2 className="text-lg font-bold text-blue-900">Clerk Workspace</h2>
-            <p className="text-xs text-slate-500 font-medium">Currently managing End-of-Day finance sheets.</p>
-          </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setActiveTab('control-tower')} 
-              className="px-3 py-1.5 text-xs font-bold rounded-lg border text-slate-700 bg-white hover:bg-slate-100 transition-all cursor-pointer"
-            >
-              Back to Control Tower
-            </button>
-            <button onClick={handleLogout} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 border border-red-100 hover:bg-red-100 transition-all flex items-center gap-1 cursor-pointer">
-              <LogOut className="h-3 w-3" /> Logout
-            </button>
-          </div>
-        </div>
-        <div className="p-2">
-          <DailySalesPosting />
-        </div>
-      </div>
-    );
-  }
-
-  // Active vs Resolved Flag Lists
-  const activeFlags = data?.flags?.filter((f: any) => !f.resolved) || [];
-  const resolvedFlags = data?.flags?.filter((f: any) => f.resolved) || [];
-
-  // Live Math calculations for Modal (Daily Sales)
+  // Math recalculations for live modal updates (Daily Sales)
   let localBalanced = true;
   let localRemittance = 0;
   let localExpected = 0;
@@ -177,152 +172,666 @@ export default function AdminDashboard() {
     localDelta = actBanked - localExpected;
   }
 
-  // Read-only modal flag check
   const modalIsReadOnly = isCEO || selectedFlag?.resolved;
 
+  // Render mock data helper if empty
+  const defaultRecentWaybills = recentWaybills.length > 0 ? recentWaybills : [
+    { waybill_no: 'WB-0529-001', sender_name: 'Ronald Bradley', chargeable_weight: 12, item_description: 'Initial commit' },
+    { waybill_no: 'WB-0529-002', sender_name: 'Russell Gibson', chargeable_weight: 8, item_description: 'Main structure' },
+    { waybill_no: 'WB-0529-003', sender_name: 'Beverly Armstrong', chargeable_weight: 15, item_description: 'Left sidebar adjustments' }
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-6xl space-y-6">
-        
-        {/* Dashboard Title Header bar */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-          <div>
-            <h1 className="text-2xl font-black text-blue-900 tracking-tight">
-              {isCEO ? 'Executive Control Tower' : 'Clerk Control Tower'}
-            </h1>
-            <p className="text-sm text-slate-500 font-medium">Real-time revenue monitoring and automated risk flagging.</p>
+    <div className="min-h-screen bg-[#f5f7fb] font-sans pb-12 antialiased">
+      
+      {/* Tabler-Style Main Header */}
+      <header className="bg-white border-b border-slate-200/80 h-16 flex items-center justify-between px-6 sticky top-0 z-40">
+        {/* Brand Logo Container */}
+        <div className="flex items-center gap-2">
+          <div className="bg-blue-600 text-white rounded-md p-1.5 flex items-center justify-center font-bold text-xs h-8 w-8 select-none">
+            &gt;-
           </div>
-          <div className="flex items-center gap-2">
-            {isClerk && (
-              <button 
-                onClick={() => setActiveTab('finance-desk')} 
-                className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 border shadow-sm hover:bg-slate-100 transition-all cursor-pointer"
-              >
-                Go to Finance Desk
-              </button>
-            )}
-            <Link href="/waybills" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700 border shadow-sm hover:bg-slate-100 transition-all">
-              Waybills Desk
-            </Link>
-            <button onClick={handleLogout} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600 border border-red-100 hover:bg-red-100 transition-all flex items-center gap-1 cursor-pointer">
-              <LogOut className="h-3 w-3" /> Logout
-            </button>
-            <button onClick={fetchDashboardMetrics} className="rounded-lg bg-white p-2 text-slate-600 border shadow-sm hover:bg-slate-100 transition-all cursor-pointer">
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          </div>
+          <span className="font-semibold text-[19px] tracking-tight text-slate-800">
+            tabler
+          </span>
+          <span className="text-xs font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded ml-2 uppercase tracking-wide">
+            osumt go
+          </span>
         </div>
 
-        {/* High-Level Overview Grid Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl bg-white p-5 border border-slate-100 shadow-sm">
-            <div className="flex justify-between items-center text-slate-400 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Total Gross Revenue</span>
-              <TrendingUp className="h-5 w-5 text-emerald-500" />
-            </div>
-            <p className="text-2xl font-extrabold text-slate-900">₦{data?.cards?.grossSales?.toLocaleString() || 0}</p>
-          </div>
+        {/* Action Elements Bar */}
+        <div className="flex items-center gap-4">
+          <a 
+            href="https://github.com/tabler/tabler" 
+            target="_blank" 
+            rel="noreferrer"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50/50 rounded-lg text-xs font-bold transition-all"
+          >
+            Source code
+          </a>
+          
+          <button className="p-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-50 relative cursor-pointer">
+            <Bell className="h-4.5 w-4.5" />
+            <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+          </button>
 
-          <div className="rounded-xl bg-white p-5 border border-slate-100 shadow-sm">
-            <div className="flex justify-between items-center text-slate-400 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Depot Field Expenses</span>
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
+          <div className="flex items-center gap-3 border-l border-slate-100 pl-4">
+            <img 
+              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces" 
+              alt="Profile" 
+              className="h-8 w-8 rounded-full border border-slate-200 shadow-xs object-cover"
+            />
+            <div className="text-left hidden md:block">
+              <p className="text-xs font-bold text-slate-700 leading-tight">Jane Pearson</p>
+              <p className="text-[10px] font-semibold text-slate-400 capitalize tracking-wider">{userRole || 'Administrator'}</p>
             </div>
-            <p className="text-2xl font-extrabold text-slate-900">₦{data?.cards?.expenses?.toLocaleString() || 0}</p>
-          </div>
-
-          <div className="rounded-xl bg-white p-5 border border-slate-100 shadow-sm">
-            <div className="flex justify-between items-center text-slate-400 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Expected Bank Slip Total</span>
-              <Landmark className="h-5 w-5 text-blue-600" />
-            </div>
-            <p className="text-2xl font-extrabold text-blue-900">₦{data?.cards?.expectedBank?.toLocaleString() || 0}</p>
-          </div>
-
-          <div className="rounded-xl bg-white p-5 border border-slate-100 shadow-sm">
-            <div className="flex justify-between items-center text-slate-400 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Net Bank Variance Delta</span>
-              <ShieldCheck className={`h-5 w-5 ${data?.cards?.netDelta >= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
-            </div>
-            <p className={`text-2xl font-extrabold ${data?.cards?.netDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              ₦{data?.cards?.netDelta?.toLocaleString() || 0}
-            </p>
           </div>
         </div>
+      </header>
 
-        {/* Active Automated System Red Flags Listing */}
-        <div className="rounded-xl bg-white border border-slate-100 shadow-sm p-6 space-y-4">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
-            Automated Audit Flags & Anomalies ({activeFlags.length})
-          </h2>
+      {/* Subheader Tab Navigation Bar */}
+      <nav className="bg-white border-b border-slate-200/80 px-6 h-12 flex items-center justify-between sticky top-16 z-30 shadow-xs">
+        <div className="flex items-center h-full gap-1 sm:gap-4 overflow-x-auto no-scrollbar">
+          {/* Dashboard Tab */}
+          <button 
+            onClick={() => {
+              if (isClerk) setActiveTab('control-tower');
+              else router.push('/dashboard');
+            }}
+            className={`h-full px-3 text-xs font-medium flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              (userRole === 'User' || activeTab === 'control-tower') 
+                ? 'text-blue-600 border-blue-600 bg-blue-50/10 font-semibold' 
+                : 'text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300'
+            }`}
+          >
+            <Clock className="h-4 w-4" /> Home
+          </button>
 
-          {activeFlags.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-6 font-medium">All systems green. No financial leakage anomalies detected across active channels.</p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {activeFlags.map((flag: any, index: number) => (
-                <div 
-                  key={index} 
-                  onClick={() => handleFlagClick(flag)}
-                  className="flex items-start justify-between py-3.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 transition-all rounded px-2 -mx-2"
-                >
-                  <div className="space-y-1">
-                    <span className={`inline-block text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded ${
-                      flag.severity === 'Critical' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
-                    }`}>
-                      {flag.type}
-                    </span>
-                    <p className="text-sm font-semibold text-slate-800">{flag.description}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-xs font-bold text-slate-400 uppercase font-mono">{flag.severity}</span>
-                    <span className="text-[10px] font-semibold text-blue-600 hover:underline">
-                      {isCEO ? 'View Details' : 'View & Update'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* Waybills Desk */}
+          <button 
+            onClick={() => router.push('/waybills')}
+            className="h-full px-3 text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300 text-xs font-medium flex items-center gap-2 border-b-2 transition-all cursor-pointer"
+          >
+            <Truck className="h-4 w-4" /> Waybills Desk
+          </button>
+
+          {/* Finance Desk Tab (For Clerk/CEO) */}
+          {(isClerk || isCEO) && (
+            <button 
+              onClick={() => {
+                if (isClerk) setActiveTab('finance-desk');
+                else router.push('/finance');
+              }}
+              className={`h-full px-3 text-xs font-medium flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                activeTab === 'finance-desk' 
+                  ? 'text-blue-600 border-blue-600 bg-blue-50/10 font-semibold' 
+                  : 'text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300'
+              }`}
+            >
+              <Landmark className="h-4 w-4" /> Finance Desk
+            </button>
           )}
+
         </div>
 
-        {/* Resolved Audit Flags History Section */}
-        {resolvedFlags.length > 0 && (
-          <div className="rounded-xl bg-white border border-slate-100 shadow-sm p-6 space-y-4 bg-emerald-50/10">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-850 border-b border-emerald-100 pb-2">
-              Resolved Audit Flags & Corrections ({resolvedFlags.length})
-            </h2>
+        <button 
+          onClick={handleLogout} 
+          className="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100/50 border border-red-150 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors"
+        >
+          <LogOut className="h-3.5 w-3.5" /> Log Out
+        </button>
+      </nav>
 
-            <div className="divide-y divide-slate-100">
-              {resolvedFlags.map((flag: any, index: number) => (
-                <div 
-                  key={index} 
-                  onClick={() => handleFlagClick(flag)}
-                  className="flex items-start justify-between py-3.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 transition-all rounded px-2 -mx-2"
-                >
-                  <div className="space-y-1">
-                    <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      RESOLVED: {flag.type}
-                    </span>
-                    <p className="text-sm font-semibold text-slate-500 line-through">{flag.description}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] font-semibold text-emerald-600 hover:underline">
-                      View Adjustment
-                    </span>
+      {/* Main Page Layout Container */}
+      <main className="max-w-7xl mx-auto px-6 mt-6">
+        
+        {/* Title Heading */}
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h2 className="text-[22px] font-semibold text-slate-800 leading-tight">Dashboard</h2>
+          </div>
+        </div>
+
+        {/* -------------------- ROLE: USER -------------------- */}
+        {userRole === 'User' && (
+          <div className="space-y-6">
+            
+            {/* 6-Grid metrics cards */}
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              
+              {/* Card 1 */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                <div className="flex justify-between items-start text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Registered</span>
+                  <span className="text-emerald-500 bg-emerald-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">+6% ▲</span>
+                </div>
+                <div>
+                  <p className="text-[26px] font-bold text-slate-800 leading-none">{recentWaybills.length || 3}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">New Waybills Today</p>
+                </div>
+              </div>
+
+              {/* Card 2 */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                <div className="flex justify-between items-start text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider">In Transit</span>
+                  <span className="text-rose-500 bg-rose-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">-3% ▼</span>
+                </div>
+                <div>
+                  <p className="text-[26px] font-bold text-slate-800 leading-none">17</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Dispatched Packages</p>
+                </div>
+              </div>
+
+              {/* Card 3 */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                <div className="flex justify-between items-start text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Delivered</span>
+                  <span className="text-emerald-500 bg-emerald-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">+9% ▲</span>
+                </div>
+                <div>
+                  <p className="text-[26px] font-bold text-slate-800 leading-none">7</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Successful Deliveries</p>
+                </div>
+              </div>
+
+              {/* Card 4 */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                <div className="flex justify-between items-start text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Cargo Weight</span>
+                  <span className="text-emerald-500 bg-emerald-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">+3% ▲</span>
+                </div>
+                <div>
+                  <p className="text-[26px] font-bold text-slate-800 leading-none">27.3k</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Total Weight (KG)</p>
+                </div>
+              </div>
+
+              {/* Card 5 */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                <div className="flex justify-between items-start text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Daily Sales</span>
+                  <span className="text-rose-500 bg-rose-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">-2% ▼</span>
+                </div>
+                <div>
+                  <p className="text-[26px] font-bold text-slate-800 leading-none">$95</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Waybill Revenue</p>
+                </div>
+              </div>
+
+              {/* Card 6 */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                <div className="flex justify-between items-start text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Pending</span>
+                  <span className="text-rose-500 bg-rose-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">-1% ▼</span>
+                </div>
+                <div>
+                  <p className="text-[26px] font-bold text-slate-800 leading-none">621</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Uncollected Freight</p>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Split layout: Floatable Waybill mockup card (Left) & Recent activity list (Right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Floatable Waybill Form Mockup Card (Spans 2/3) */}
+              <div 
+                onClick={() => router.push('/waybills')}
+                className="group lg:col-span-2 bg-white border border-slate-200/85 rounded-xl shadow-xs hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col"
+              >
+                {/* Overlay hover launch banner */}
+                <div className="absolute inset-0 bg-blue-900/5 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center backdrop-blur-[1px]">
+                  <div className="bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg shadow-lg flex items-center gap-2 transform scale-95 group-hover:scale-100 transition-all duration-300">
+                    Launch Waybill Registration Desk
+                    <ExternalLink className="h-4 w-4" />
                   </div>
                 </div>
-              ))}
+
+                {/* Card Header */}
+                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200/60 bg-slate-50/50">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">Waybill Registration Desk</h3>
+                    <p className="text-xs text-slate-400">Click anywhere to open the live shipping quote form</p>
+                  </div>
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                    <Truck className="h-5 w-5" />
+                  </div>
+                </div>
+
+                {/* Simulated Waybill Form Mockup */}
+                <div className="p-6 space-y-4 select-none">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sender Name</label>
+                      <div className="mt-1 h-9 bg-slate-50 rounded-lg border border-slate-200 flex items-center px-3 text-xs text-slate-400">
+                        John Doe
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Receiver Name</label>
+                      <div className="mt-1 h-9 bg-slate-50 rounded-lg border border-slate-200 flex items-center px-3 text-xs text-slate-400">
+                        Jane Smith
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Item Contents</label>
+                    <div className="mt-1 h-9 bg-slate-50 rounded-lg border border-slate-200 flex items-center px-3 text-xs text-slate-400">
+                      Electronics, Spare Parts
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weight (KG)</label>
+                      <div className="mt-1 h-9 bg-slate-50 rounded-lg border border-slate-200 flex items-center px-3 text-xs text-slate-400">
+                        5
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fragile Handling</label>
+                      <div className="mt-2.5 flex items-center gap-2 text-xs text-slate-400">
+                        <span className="h-4 w-4 rounded border border-slate-350 bg-slate-50 block"></span> Yes (+₦1,500)
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Delivery Option</label>
+                      <div className="mt-2.5 flex items-center gap-2 text-xs text-slate-400">
+                        <span className="h-4 w-4 rounded border border-slate-350 bg-slate-50 block"></span> Door-to-Door
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <div className="w-full bg-blue-600 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 text-xs">
+                      Save & Issue Waybill
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Activity List Card (Spans 1/3, matching Tabler Development Activity structure) */}
+              <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs flex flex-col">
+                <div className="px-5 py-4 border-b border-slate-250/60">
+                  <h3 className="text-sm font-semibold text-slate-800">Development Activity</h3>
+                </div>
+                
+                {/* SVG purchases chart line at top */}
+                <div className="bg-slate-50/20 py-2 border-b border-slate-100 relative">
+                  <span className="text-[10px] font-semibold text-slate-400 absolute left-4 top-2 flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-blue-600"></span> Purchases
+                  </span>
+                  <svg className="w-full h-16 pt-6" viewBox="0 0 500 100" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#206bc4" stopOpacity="0.15" />
+                        <stop offset="100%" stopColor="#206bc4" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+                    <path 
+                      d="M0 60 Q 40 40, 80 50 T 160 55 T 240 45 T 320 60 T 400 35 T 480 15 T 500 10 L 500 100 L 0 100 Z" 
+                      fill="url(#chartGradient)" 
+                    />
+                    <path 
+                      d="M0 60 Q 40 40, 80 50 T 160 55 T 240 45 T 320 60 T 400 35 T 480 15 T 500 10" 
+                      fill="none" 
+                      stroke="#206bc4" 
+                      strokeWidth="2" 
+                    />
+                  </svg>
+                </div>
+
+                {/* Commits table */}
+                <div className="divide-y divide-slate-100 flex-1">
+                  {defaultRecentWaybills.map((wb, i) => (
+                    <div key={i} className="px-5 py-3.5 flex items-center justify-between text-xs hover:bg-slate-50/40">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600 select-none">
+                          {wb.sender_name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-700 leading-tight">{wb.sender_name}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{wb.waybill_no}</p>
+                          <p className="text-[10px] text-slate-400">{wb.item_description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-semibold text-slate-400">May 29, 2026</span>
+                        <button className="text-slate-350 hover:text-red-500 rounded p-1 hover:bg-slate-100">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
           </div>
         )}
 
-      </div>
+        {/* -------------------- ROLE: CLERK / CEO -------------------- */}
+        {(isClerk || isCEO) && (
+          <div className="space-y-6">
+            
+            {/* Control Tower Tab switching Header (Only for Clerk) */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-800">
+                  {isCEO ? 'Executive Control Tower' : 'Administrative Desk'}
+                </h3>
+              </div>
+              {isClerk && (
+                <div className="flex border border-slate-200/80 rounded-lg overflow-hidden bg-white shadow-xs">
+                  <button 
+                    onClick={() => setActiveTab('control-tower')}
+                    className={`px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                      activeTab === 'control-tower' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    Control Tower
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('finance-desk')}
+                    className={`px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                      activeTab === 'finance-desk' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    Finance Desk
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {activeTab === 'control-tower' ? (
+              <div className="space-y-6">
+                
+                {/* 6-Grid metrics cards */}
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                  
+                  {/* Card 1: Gross Sales */}
+                  <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                    <div className="flex justify-between items-start text-slate-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Gross Sales</span>
+                      <span className="text-emerald-500 bg-emerald-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">+6% ▲</span>
+                    </div>
+                    <div>
+                      <p className="text-[22px] font-bold text-slate-800 leading-none">₦{data?.cards?.grossSales?.toLocaleString() || '0'}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Total revenue collected</p>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Expenses */}
+                  <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                    <div className="flex justify-between items-start text-slate-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Expenses</span>
+                      <span className="text-rose-500 bg-rose-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">-3% ▼</span>
+                    </div>
+                    <div>
+                      <p className="text-[22px] font-bold text-slate-800 leading-none">₦{data?.cards?.expenses?.toLocaleString() || '0'}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Approved depot cashout</p>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Expected Bank */}
+                  <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                    <div className="flex justify-between items-start text-slate-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Expected Bank</span>
+                      <span className="text-emerald-500 bg-emerald-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">+9% ▲</span>
+                    </div>
+                    <div>
+                      <p className="text-[22px] font-bold text-blue-700 leading-none">₦{data?.cards?.expectedBank?.toLocaleString() || '0'}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Expected deposit slip sum</p>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Net Variance */}
+                  <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                    <div className="flex justify-between items-start text-slate-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Net Variance</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
+                        (data?.cards?.netDelta || 0) >= 0 ? 'text-emerald-500 bg-emerald-50' : 'text-red-500 bg-red-50'
+                      }`}>
+                        {(data?.cards?.netDelta || 0) >= 0 ? 'Green' : 'Critical'}
+                      </span>
+                    </div>
+                    <div>
+                      <p className={`text-[22px] font-bold leading-none ${
+                        (data?.cards?.netDelta || 0) >= 0 ? 'text-emerald-600' : 'text-red-650'
+                      }`}>
+                        ₦{data?.cards?.netDelta?.toLocaleString() || '0'}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">Net banking discrepancy</p>
+                    </div>
+                  </div>
+
+                  {/* Card 5: Active Flags */}
+                  <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                    <div className="flex justify-between items-start text-slate-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Active Flags</span>
+                      <span className="text-rose-500 bg-rose-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">-2% ▼</span>
+                    </div>
+                    <div>
+                      <p className="text-[22px] font-bold text-slate-800 leading-none">{activeFlags.length}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Requires reconciliation</p>
+                    </div>
+                  </div>
+
+                  {/* Card 6: Resolved Flags */}
+                  <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col justify-between h-[100px]">
+                    <div className="flex justify-between items-start text-slate-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Resolved</span>
+                      <span className="text-emerald-500 bg-emerald-50 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">+3% ▲</span>
+                    </div>
+                    <div>
+                      <p className="text-[22px] font-bold text-slate-800 leading-none">{resolvedFlags.length}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Resolved audit history</p>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Main Content Split: Tables (Left) & Documentation/Charts (Right) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Tables Column (Left, Spans 2/3) */}
+                  <div className="lg:col-span-2 space-y-6">
+                    {/* Active Flags */}
+                    <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden flex flex-col">
+                      <div className="px-5 py-4 border-b border-slate-200/60 bg-slate-50/50 flex justify-between items-center">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Automated Audit Flags & Anomalies ({activeFlags.length})
+                        </h3>
+                      </div>
+                      
+                      {activeFlags.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-10 font-medium">All systems green. No financial leakage anomalies detected across active channels.</p>
+                      ) : (
+                        <div className="divide-y divide-slate-100">
+                          {activeFlags.map((flag: any, index: number) => (
+                            <div 
+                              key={index} 
+                              onClick={() => handleFlagClick(flag)}
+                              className="flex items-start justify-between p-4 cursor-pointer hover:bg-slate-50 transition-all"
+                            >
+                              <div className="space-y-1 pr-4">
+                                <span className={`inline-block text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded ${
+                                  flag.severity === 'Critical' ? 'bg-red-50 text-red-650 border border-red-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                }`}>
+                                  {flag.type}
+                                </span>
+                                <p className="text-xs font-semibold text-slate-700">{flag.description}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                <span className="text-[10px] font-semibold text-slate-400 font-mono uppercase">{flag.severity}</span>
+                                <span className="text-[10px] font-bold text-blue-600 hover:underline">
+                                  {isCEO ? 'View Details' : 'View & Update'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Resolved Flags */}
+                    {resolvedFlags.length > 0 && (
+                      <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden flex flex-col border-l-4 border-l-emerald-500">
+                        <div className="px-5 py-4 border-b border-slate-200/60 bg-emerald-50/10 flex justify-between items-center">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                            Resolved Audit Flags & Corrections ({resolvedFlags.length})
+                          </h3>
+                        </div>
+
+                        <div className="divide-y divide-slate-100">
+                          {resolvedFlags.map((flag: any, index: number) => (
+                            <div 
+                              key={index} 
+                              onClick={() => handleFlagClick(flag)}
+                              className="flex items-start justify-between p-4 cursor-pointer hover:bg-slate-50 transition-all"
+                            >
+                              <div className="space-y-1 pr-4">
+                                <span className="inline-block text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                  Resolved: {flag.type}
+                                </span>
+                                <p className="text-xs font-semibold text-slate-500 line-through">{flag.description}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                <span className="text-[10px] font-bold text-emerald-600 hover:underline">
+                                  View Adjustment
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Documentation & SVG Charts Sidebar (Right, Spans 1/3) */}
+                  <div className="space-y-6">
+                    
+                    {/* Blue Documentation Banner */}
+                    <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 text-xs text-blue-700 flex flex-col justify-between hover:bg-blue-50 transition-all">
+                      <p className="font-semibold leading-relaxed">
+                        Read our documentation with code samples.
+                      </p>
+                      <a 
+                        href="#" 
+                        onClick={(e) => e.preventDefault()}
+                        className="text-blue-600 font-bold mt-2 hover:underline inline-flex items-center gap-1"
+                      >
+                        Explore Docs ↗
+                      </a>
+                    </div>
+
+                    {/* Chart 1: Donut Chart (Green) */}
+                    <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col items-center">
+                      <div className="w-full text-left border-b border-slate-100 pb-3 mb-4">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Anomaly Clearance Rate</h4>
+                      </div>
+                      
+                      {/* SVG Donut Chart */}
+                      <div className="relative flex items-center justify-center">
+                        <svg className="w-36 h-36" viewBox="0 0 36 36">
+                          <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f1f5f9" strokeWidth="3.2" />
+                          <circle 
+                            cx="18" 
+                            cy="18" 
+                            r="15.915" 
+                            fill="none" 
+                            stroke="#2fb344" 
+                            strokeWidth="3.2" 
+                            strokeDasharray="63 37" 
+                            strokeDashoffset="25" 
+                          />
+                          <circle 
+                            cx="18" 
+                            cy="18" 
+                            r="15.915" 
+                            fill="none" 
+                            stroke="#8cd494" 
+                            strokeWidth="3.2" 
+                            strokeDasharray="37 63" 
+                            strokeDashoffset="88" 
+                          />
+                        </svg>
+                        <div className="absolute text-center">
+                          <p className="text-[20px] font-bold text-slate-800 leading-none">63.0%</p>
+                          <p className="text-[9px] text-slate-400 mt-1">Resolved</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-4 mt-4 text-[10px] font-semibold text-slate-500">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-full bg-[#2fb344]"></span> Resolved (63.0%)
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-full bg-[#8cd494]"></span> Pending (37.0%)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Chart 2: Pie Chart (Blue/Slate) */}
+                    <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-xs flex flex-col items-center">
+                      <div className="w-full text-left border-b border-slate-100 pb-3 mb-4">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Revenue Channels Allocation</h4>
+                      </div>
+
+                      {/* SVG Pie Chart */}
+                      <div className="relative flex items-center justify-center">
+                        <svg className="w-36 h-36 -rotate-90" viewBox="0 0 32 32">
+                          <circle cx="16" cy="16" r="8" fill="none" stroke="#94a3b8" strokeWidth="16" strokeDasharray="100 100" />
+                          <circle cx="16" cy="16" r="8" fill="none" stroke="#93c5fd" strokeWidth="16" strokeDasharray="91 100" />
+                          <circle cx="16" cy="16" r="8" fill="none" stroke="#3b82f6" strokeWidth="16" strokeDasharray="80.5 100" />
+                          <circle cx="16" cy="16" r="8" fill="none" stroke="#1d4ed8" strokeWidth="16" strokeDasharray="47.4 100" />
+                        </svg>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-5 text-[10px] font-semibold text-slate-500 w-full px-2">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-[#1d4ed8]"></span> Cash/POS (47.4%)
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-[#3b82f6]"></span> Credit Sales (33.1%)
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-[#93c5fd]"></span> Credit Paid (10.5%)
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-[#94a3b8]"></span> Expenses (9.0%)
+                        </span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+            ) : (
+              /* Inside clerk view, switch tab to Finance Desk daily sales form entry */
+              <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
+                <DailySalesPosting />
+              </div>
+            )}
+
+          </div>
+        )}
+
+      </main>
 
       {/* Flag View/Edit Modal Overlay */}
       {selectedFlag && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto font-sans">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto font-sans">
             <div className="flex items-center justify-between border-b pb-2">
               <h3 className="text-base font-bold text-blue-900">
                 {selectedFlag.type} (ID: {selectedFlag.id})
@@ -345,13 +854,13 @@ export default function AdminDashboard() {
             {modalData && (
               <form onSubmit={handleUpdateRecord} className="space-y-4">
                 {selectedFlag.resolved ? (
-                  <p className="text-xs text-emerald-850 bg-emerald-50 border border-emerald-200 p-2.5 rounded flex items-center gap-1.5 font-bold">
-                    <CheckCircle className="h-4 w-4 text-emerald-650" />
+                  <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-250 p-2.5 rounded flex items-center gap-1.5 font-bold">
+                    <CheckCircle className="h-4 w-4 text-emerald-600" />
                     This operational flag has been resolved and logged in history.
                   </p>
                 ) : isCEO ? (
-                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded">
-                    You have <strong>Read-Only</strong> permissions as CEO. Use the Close button to dismiss.
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded font-semibold">
+                    You have Read-Only permissions as CEO. Use the Close button to dismiss.
                   </p>
                 ) : null}
 
@@ -364,7 +873,7 @@ export default function AdminDashboard() {
                         type="date" 
                         disabled 
                         value={modalData.posting_date || ''} 
-                        className="w-full mt-1 rounded-lg border border-slate-200 p-2 text-sm bg-slate-50 text-slate-500 cursor-not-allowed font-medium"
+                        className="w-full mt-1 rounded-lg border border-slate-200 p-2 text-sm bg-slate-50 text-slate-500 cursor-not-allowed font-medium animate-none"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -403,7 +912,7 @@ export default function AdminDashboard() {
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                           <Scale className={`h-4 w-4 ${localBalanced ? 'text-emerald-500' : 'text-red-500'}`} />
-                          <span className={`text-[10px] font-bold ${localBalanced ? 'text-emerald-600' : 'text-red-600'}`}>
+                          <span className={`text-[10px] font-bold ${localBalanced ? 'text-emerald-600' : 'text-red-650'}`}>
                             {localBalanced ? 'Balanced' : 'Mismatch'}
                           </span>
                         </div>
@@ -451,7 +960,7 @@ export default function AdminDashboard() {
                         <span>₦{localExpected.toLocaleString()}</span>
                       </div>
                       <div className={`flex justify-between font-bold border-t pt-1.5 ${
-                        localDelta === 0 ? 'text-emerald-600' : 'text-red-655'
+                        localDelta === 0 ? 'text-emerald-600' : 'text-red-650'
                       }`}>
                         <span>Bank Delta Variance:</span>
                         <span>₦{localDelta.toLocaleString()}</span>
@@ -529,7 +1038,7 @@ export default function AdminDashboard() {
                           disabled={modalIsReadOnly}
                           checked={modalData.is_discount_approved} 
                           onChange={(e) => setModalData({ ...modalData, is_discount_approved: e.target.checked })}
-                          className="h-4 w-4 text-blue-900 focus:ring-blue-600 disabled:cursor-not-allowed"
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-600 disabled:cursor-not-allowed"
                         />
                         <span>Discount Approved by Management</span>
                       </label>
@@ -550,7 +1059,7 @@ export default function AdminDashboard() {
                     <button 
                       type="submit" 
                       disabled={modalLoading || !localBalanced}
-                      className="px-4 py-2 bg-blue-900 text-white rounded-lg hover:bg-blue-950 text-sm font-bold disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-bold disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer animate-none"
                     >
                       {modalLoading ? 'Saving...' : 'Save Corrections'}
                     </button>

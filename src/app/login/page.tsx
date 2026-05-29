@@ -34,10 +34,10 @@ export default function LoginPage() {
 
       if (selectedRole === 'User') {
         mappedRole = 'User';
-        redirectUrl = '/waybills';
+        redirectUrl = '/dashboard';
       } else if (selectedRole === 'Clerk') {
         mappedRole = 'Revenue Clerk';
-        redirectUrl = '/finance';
+        redirectUrl = '/dashboard';
       } else if (selectedRole === 'CEO') {
         mappedRole = 'Super Admin / CEO';
         redirectUrl = '/dashboard';
