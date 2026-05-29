@@ -36,8 +36,12 @@ export default function AdminDashboard() {
   const [userRole, setUserRole] = useState<string>('');
   const [recentWaybills, setRecentWaybills] = useState<any[]>([]);
 
-  // Clerk specific tabs: 'control-tower' | 'finance-desk'
-  const [activeTab, setActiveTab] = useState<'control-tower' | 'finance-desk'>('control-tower');
+  // Clerk specific tabs: 'control-tower' | 'finance-desk' | 'payment-desk'
+  const [activeTab, setActiveTab] = useState<'control-tower' | 'finance-desk' | 'payment-desk'>('control-tower');
+
+  // Payment Desk State
+  const [todaysWaybills, setTodaysWaybills] = useState<any[]>([]);
+  const [paymentUpdating, setPaymentUpdating] = useState<number | null>(null);
 
   // Flag Modal State
   const [selectedFlag, setSelectedFlag] = useState<any>(null);
@@ -63,6 +67,28 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchTodaysWaybills = async () => {
+    try {
+      const response = await axios.get('http://localhost:3000/waybills/today');
+      setTodaysWaybills(response.data);
+    } catch (err) {
+      console.error('Error fetching today\'s waybills', err);
+    }
+  };
+
+  const handleMarkPaid = async (waybillId: number) => {
+    setPaymentUpdating(waybillId);
+    try {
+      await axios.patch(`http://localhost:3000/waybills/${waybillId}/payment`);
+      // Refresh the list immediately after update
+      await fetchTodaysWaybills();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update payment status');
+    } finally {
+      setPaymentUpdating(null);
+    }
+  };
+
   useEffect(() => {
     const role = getCookie('user_role');
     if (!role) {
@@ -79,6 +105,9 @@ export default function AdminDashboard() {
       setLoading(true);
       if (isCEO || isClerkOrFinance) {
         await fetchDashboardMetrics();
+      }
+      if (isClerkOrFinance) {
+        await fetchTodaysWaybills();
       }
       await fetchRecentWaybills();
       setLoading(false);
@@ -279,6 +308,20 @@ export default function AdminDashboard() {
               }`}
             >
               <Landmark className="h-4 w-4" /> Finance Desk
+            </button>
+          )}
+
+          {/* Payment Desk Tab (For Clerk only) */}
+          {isClerk && (
+            <button 
+              onClick={() => { setActiveTab('payment-desk'); fetchTodaysWaybills(); }}
+              className={`h-full px-3 text-xs font-medium flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                activeTab === 'payment-desk' 
+                  ? 'text-blue-600 border-blue-600 bg-blue-50/10 font-semibold' 
+                  : 'text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300'
+              }`}
+            >
+              <Scale className="h-4 w-4" /> Payment Desk
             </button>
           )}
 
@@ -556,6 +599,16 @@ export default function AdminDashboard() {
                   >
                     Finance Desk
                   </button>
+                  <button 
+                    onClick={() => { setActiveTab('payment-desk'); fetchTodaysWaybills(); }}
+                    className={`px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                      activeTab === 'payment-desk' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    Payment Desk
+                  </button>
                 </div>
               )}
             </div>
@@ -826,10 +879,109 @@ export default function AdminDashboard() {
                 </div>
 
               </div>
-            ) : (
+            ) : activeTab === 'finance-desk' ? (
               /* Inside clerk view, switch tab to Finance Desk daily sales form entry */
               <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
                 <DailySalesPosting />
+              </div>
+            ) : (
+              /* Payment Desk: Today's Waybills with Payment Toggle */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">Today's Waybills — Payment Status</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{todaysWaybills.length} waybill(s) processed today</p>
+                  </div>
+                  <button 
+                    onClick={fetchTodaysWaybills}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100/50 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Refresh
+                  </button>
+                </div>
+
+                {todaysWaybills.length === 0 ? (
+                  <div className="bg-white border border-slate-200/80 rounded-xl p-12 text-center shadow-xs">
+                    <Truck className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm font-semibold text-slate-500">No waybills processed today yet.</p>
+                    <p className="text-xs text-slate-400 mt-1">Waybills registered today will appear here automatically.</p>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-slate-50/80 border-b border-slate-200">
+                            <th className="text-left px-4 py-3 font-bold uppercase tracking-wider text-slate-500 text-[10px]">Waybill No</th>
+                            <th className="text-left px-4 py-3 font-bold uppercase tracking-wider text-slate-500 text-[10px]">Sender</th>
+                            <th className="text-left px-4 py-3 font-bold uppercase tracking-wider text-slate-500 text-[10px]">Receiver</th>
+                            <th className="text-left px-4 py-3 font-bold uppercase tracking-wider text-slate-500 text-[10px]">Route</th>
+                            <th className="text-right px-4 py-3 font-bold uppercase tracking-wider text-slate-500 text-[10px]">Amount (₦)</th>
+                            <th className="text-center px-4 py-3 font-bold uppercase tracking-wider text-slate-500 text-[10px]">Payment</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {todaysWaybills.map((wb: any) => (
+                            <tr key={wb.id} className="hover:bg-slate-50/40 transition-colors">
+                              <td className="px-4 py-3 font-mono font-bold text-blue-700">{wb.waybill_no}</td>
+                              <td className="px-4 py-3">
+                                <p className="font-semibold text-slate-700">{wb.sender_name}</p>
+                                <p className="text-[10px] text-slate-400">{wb.sender_phone}</p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="font-semibold text-slate-700">{wb.receiver_name}</p>
+                                <p className="text-[10px] text-slate-400">{wb.receiver_phone}</p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="text-slate-600">{wb.origin || '—'}</p>
+                                <p className="text-[10px] text-slate-400">→ {wb.destination || '—'}</p>
+                              </td>
+                              <td className="px-4 py-3 text-right font-bold text-slate-800">
+                                ₦{Number(wb.final_charged_price).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {wb.payment === 'Paid' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
+                                    <CheckCircle className="h-3 w-3" /> Paid
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleMarkPaid(wb.id)}
+                                    disabled={paymentUpdating === wb.id}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-all cursor-pointer disabled:opacity-50"
+                                  >
+                                    {paymentUpdating === wb.id ? (
+                                      <><RefreshCw className="h-3 w-3 animate-spin" /> Updating...</>
+                                    ) : (
+                                      <><Scale className="h-3 w-3" /> Unpaid — Click to Mark Paid</>
+                                    )}
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Summary Footer */}
+                    <div className="bg-slate-50/80 border-t border-slate-200 px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center gap-4 text-[10px] font-semibold text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                          Paid: {todaysWaybills.filter((w: any) => w.payment === 'Paid').length}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                          Unpaid: {todaysWaybills.filter((w: any) => w.payment !== 'Paid').length}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-700">
+                        Total: ₦{todaysWaybills.reduce((sum: number, w: any) => sum + Number(w.final_charged_price), 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
